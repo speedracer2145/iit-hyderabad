@@ -1,0 +1,408 @@
+% ============================================================
+%  NF Validation Research Strategies — Main LaTeX Document
+%  Author: Alok Prakash
+%  This document synthesizes research findings for improving
+%  Yaksha-Prashna in NF Validation and Network Verification
+% ============================================================
+
+\documentclass[12pt, a4paper]{article}
+
+% ---------- Packages ----------
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mdframed}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{soul}
+\usepackage{listings}
+\usepackage{tocloft}
+\usepackage[normalem]{ulem}
+
+% ---------- Colors ----------
+\definecolor{ypblue}{RGB}{30, 90, 160}
+\definecolor{strategygreen}{RGB}{34, 120, 56}
+\definecolor{warningorange}{RGB}{200, 100, 20}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgray}{RGB}{60, 60, 60}
+\definecolor{accentred}{RGB}{180, 30, 30}
+
+% ---------- Custom Environments ----------
+\tcbuselibrary{skins, breakable}
+
+\newtcolorbox{strategybox}{
+  enhanced,
+  breakable,
+  colback=strategygreen!8,
+  colframe=strategygreen!70!black,
+  title=\textbf{Research Strategy for Yaksha-Prashna},
+  fonttitle=\small\bfseries,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=strategygreen!80!black, colframe=strategygreen!80!black},
+  left=4pt, right=4pt, top=4pt, bottom=4pt
+}
+
+\newtcolorbox{analogybox}{
+  enhanced,
+  breakable,
+  colback=ypblue!7,
+  colframe=ypblue!60,
+  title=\textbf{Analogy to Yaksha-Prashna},
+  fonttitle=\small\bfseries,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=ypblue!80, colframe=ypblue!80},
+  left=4pt, right=4pt, top=4pt, bottom=4pt
+}
+
+\newtcolorbox{limitbox}{
+  enhanced,
+  breakable,
+  colback=warningorange!8,
+  colframe=warningorange!70,
+  title=\textbf{Limitations w.r.t.\ Yaksha-Prashna},
+  fonttitle=\small\bfseries,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=warningorange!80, colframe=warningorange!80},
+  left=4pt, right=4pt, top=4pt, bottom=4pt
+}
+
+\newtcolorbox{insightbox}{
+  enhanced,
+  breakable,
+  colback=lightgray,
+  colframe=darkgray!50,
+  title=\textbf{Key Insight},
+  fonttitle=\small\bfseries,
+  left=4pt, right=4pt, top=4pt, bottom=4pt
+}
+
+% ---------- Header/Footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{darkgray}{NF Validation Research Strategies}}
+\fancyhead[R]{\small\textcolor{darkgray}{Alok Prakash}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- Section Formatting ----------
+\titleformat{\section}[block]
+  {\Large\bfseries\color{ypblue}}
+  {\thesection}{1em}{}[\titlerule]
+
+\titleformat{\subsection}[block]
+  {\large\bfseries\color{darkgray}}
+  {\thesubsection}{1em}{}
+
+\titleformat{\subsubsection}[runin]
+  {\normalsize\bfseries\color{strategygreen}}
+  {\thesubsubsection}{1em}{}[.]
+
+% ---------- Hyperref Setup ----------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=ypblue,
+  citecolor=strategygreen,
+  urlcolor=accentred,
+  pdftitle={NF Validation Research Strategies},
+  pdfauthor={Alok Prakash},
+}
+
+% ---------- Listings ----------
+\lstset{
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{lightgray},
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{darkgray!40},
+  breaklines=true,
+}
+
+% ============================================================
+\begin{document}
+% ============================================================
+
+% ---------- Title Page ----------
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries\color{ypblue} NF Validation Research Strategies\par}
+  \vspace{0.5cm}
+  {\large\color{darkgray} Findings from Selected Papers for Improving Yaksha-Prashna\\
+  in NF Validation and Network Verification\par}
+  \vspace{2cm}
+  {\large\bfseries Alok Prakash\par}
+  \vspace{0.5cm}
+  {\normalsize IIT Hyderabad \par}
+  \vspace{0.3cm}
+  {\normalsize \today\par}
+  \vspace{3cm}
+  \begin{mdframed}[backgroundcolor=lightgray, linecolor=ypblue, linewidth=1.5pt]
+    \centering
+    \small\textit{This document is a living research strategy record synthesizing insights
+    from a curated literature survey of 89 papers (filtered to 16 high-impact works)
+    on NF validation and network verification, with the explicit goal of identifying
+    concrete improvements for Yaksha-Prashna.}
+  \end{mdframed}
+\end{titlepage}
+
+% ---------- Table of Contents ----------
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{Problem Statement and Research Context}
+\label{sec:problem}
+% ============================================================
+
+\subsection{What is Yaksha-Prashna?}
+
+Yaksha-Prashna is a pioneering system for functional correctness verification of eBPF Network Functions (NFs) directly from compiled bytecode. Among its notable achievements, it operates on raw eBPF XDP/TC bytecode without requiring source code, and it performs multi-program chain verification — two capabilities unmatched by prior work in the field.
+
+Technically, Yaksha-Prashna operates as follows:
+\begin{enumerate}
+  \item \textbf{Input}: Compiled eBPF object file (ELF binary) — no source code, no annotations required.
+  \item \textbf{CFG-NC Construction}: Builds a \emph{Control Flow Graph with Network Context}, capturing:
+    \begin{itemize}
+      \item Packet header field accesses (which fields are read/written)
+      \item BPF map read/write operations (which maps, what keys)
+      \item Helper function call sequences (\texttt{bpf\_map\_lookup\_elem}, \texttt{bpf\_redirect}, etc.)
+      \item XDP/TC action decisions (\texttt{XDP\_PASS}, \texttt{XDP\_DROP}, \texttt{TC\_ACT\_OK}, etc.)
+    \end{itemize}
+  \item \textbf{Prolog Query Engine}: A Prolog-based query engine evaluates behavioral assertions against the CFG-NC, answering questions like ``Does this program ever drop packets matching predicate $P$?'' or ``Does NF$_i$'s output ever reach NF$_{i+1}$ with field $F$ unmodified?''
+  \item \textbf{Chain Analysis}: Handles eBPF NF chains by composing CFG-NC representations across multiple programs, tracking stateful carry-over via shared BPF map dependency analysis.
+\end{enumerate}
+
+\subsection{Current Limitations}
+
+Despite these contributions, Yaksha-Prashna has known limitations that motivate this research survey:
+
+\begin{enumerate}
+  \item \textbf{Limited stateful field tracking}: Only 6 packet header fields are modeled in the stateful component of CFG-NC analysis, limiting the scope of behavioral queries.
+  \item \textbf{Path explosion risk}: Complex NFs with large state spaces can exhaust the static analysis budget, a problem shared by symbolic execution approaches.
+  \item \textbf{Narrow behavioral query vocabulary}: The Prolog query language lacks temporal operators (no LTL-style ``eventually'' or ``always before''), limiting expressiveness for multi-packet chain properties.
+  \item \textbf{No formal BPF map composition model}: While YP tracks BPF map dependencies across chains, there is no formal algebraic model of map state composition.
+  \item \textbf{No performance-level assertions}: YP verifies functional correctness but cannot assert performance properties (e.g., ``this NF processes $\geq X$ Mpps for $\leq 64$B packets'').
+  \item \textbf{No probabilistic or approximate reasoning}: All assertions are binary (holds/violates) with no gradation.
+\end{enumerate}
+
+\subsection{Research Agenda}
+
+This document records our research strategy as we survey the literature to find concrete, actionable improvements for Yaksha-Prashna. We have surveyed 89 papers in the domain of NF validation, network verification, and eBPF program analysis. After filtering for relevance, methodological novelty, and compatibility with Yaksha-Prashna's bytecode-level approach, we have identified \textbf{16 high-impact papers}. This document contains in-depth analyses of 9 of these, each analyzed through the lens of: ``What can YP concretely borrow from this work?''
+
+The spreadsheet tracking all papers is maintained at:\\
+\url{https://docs.google.com/spreadsheets/d/1co271Fl6_rgMSXye8-byWxMWKNp_goEyqrY8yG3DUQo/edit}
+
+% ============================================================
+\section{Research Analysis: Heimdall}
+\label{sec:heimdall}
+% ============================================================
+
+\subsection*{Paper: Heimdall: LLM + Symbolic Execution for eBPF C-to-Rust Migration Verification}
+\textbf{Year}: 2026 (preprint) \quad \textbf{arXiv}: 2605.25411 \quad \textbf{Authors}: Vasu Dasu, Monika Sharma et al., Penn State / UIC
+
+\subsubsection{First-Pass Intuition}
+
+This paper addresses a specific and dangerous class of bugs in eBPF programs: \emph{source-level bugs that corrupt data and leak previously traced events to userspace}. Using this leaked information, an attacker can recover data normally hidden or secured by KASLR (Kernel Address Space Layout Randomization --- a cybersecurity mitigation that randomizes kernel memory locations). The authors discovered unreported leaks in 10 open-source eBPF programs whose ring buffer or stack records contained previously traced data.
+
+Heimdall is an automated pipeline to harden such verifier-accepted but buggy programs. The eBPF verifier accepts these programs because they are \emph{safe} by the verifier's definition (no out-of-bounds memory access, no null pointer dereferences) --- but safety is not the same as security. A program can be safe yet leak sensitive kernel memory to userspace through poorly managed ring buffer residue.
+
+\subsubsection{Classification as NF Validation}
+
+\begin{insightbox}
+This paper is \emph{borderline} NF validation. Its primary contribution is \textbf{compiler verification / security hardening}: it validates that a migrated eBPF program does not introduce new information leaks. However, at its core, it \emph{is} validating an eBPF program's behavioral equivalence --- which is a form of NF behavioral validation. Most importantly, the methodology (symbolic execution on eBPF bytecode + Z3 equivalence) is directly applicable to NF behavioral validation even if that was not the authors' primary intent.
+\end{insightbox}
+
+\subsubsection{Technical Mechanism}
+
+Heimdall is a 5-stage automated pipeline for C$\to$Rust eBPF migration with formal equivalence verification:
+
+\begin{enumerate}
+  \item \textbf{LLM Translation}: A GPT-class LLM translates legacy eBPF C code to Rust-eBPF (Aya framework).
+  \item \textbf{Compile + KV Verify}: Both C and Rust programs are compiled to eBPF bytecode. Key-value pair analysis checks basic structural equivalence.
+  \item \textbf{Static Safety Engine}: A rule-based static checker verifies that the Rust translation does not introduce new unsafe patterns.
+  \item \textbf{Symbolic Execution (angr backend)}: A custom eBPF backend for the \texttt{angr} Python binary analysis framework symbolically executes both the original C-compiled bytecode and the Rust-compiled bytecode. This is a novel contribution: the team built a full eBPF VEX IR lifter, ELF loader, 20+ BPF map type models, and all BPF helpers as symbolic stubs.
+  \item \textbf{Z3 Equivalence Check + CEGIS Repair}: Z3 is invoked to prove that for all inputs, both programs produce identical packet decisions and map state changes. When Z3 finds a counterexample, a CEGIS (Counterexample-Guided Inductive Synthesis) loop re-prompts the LLM for a corrected translation.
+\end{enumerate}
+
+\textbf{Key tools}: \texttt{angr} (Python binary analysis), Z3 SMT solver, GPT-class LLM (for translation), Clang/LLVM (for eBPF compilation), Aya (Rust eBPF framework).
+
+\textbf{Novel data structure}: \emph{ITE-chain map encoding} --- bitvector-based encoding of BPF map semantics as if-then-else chains in Z3, replacing Theory of Arrays (which is incompatible with angr/Claripy).
+
+\textbf{Achieved}: 96/102 (94.1\%) formally proven-equivalent translations on real-world eBPF programs.
+
+\subsubsection{Security Findings}
+
+Beyond NF migration, Heimdall discovered real security vulnerabilities:
+\begin{itemize}
+  \item \textbf{KASLR-defeating stack leak} in \texttt{bashreadline}
+  \item \textbf{9 cross-event ring-buffer residue leaks} in \texttt{mountsnoop}, \texttt{opensnoop}, and other bpftrace tools
+\end{itemize}
+These were previously verifier-accepted programs --- demonstrating that the eBPF verifier's safety guarantees are insufficient for security.
+
+\begin{analogybox}
+\textbf{What Heimdall does with angr + Z3} is directly analogous to \textbf{what YP does with CFG-NC + Prolog}:
+\begin{itemize}
+  \item Both operate on eBPF bytecode (no source code required)
+  \item Both extract a behavioral model from the bytecode (Heimdall: symbolic states; YP: CFG-NC dataflow)
+  \item Both query properties over that model (Heimdall: Z3 equivalence; YP: Prolog assertions)
+  \item Heimdall's ITE-chain BPF map encoding is the symbolic-execution counterpart of YP's map dependency tracking
+\end{itemize}
+The critical difference: Heimdall does \emph{equivalence checking} (are two programs behaviorally identical?), while YP does \emph{assertion checking} (does this program satisfy property $P$?). Both are needed for full NF validation.
+\end{analogybox}
+
+\begin{strategybox}
+\textbf{Strategy 1 — Adopt angr's eBPF backend as a symbolic layer for YP}:\\
+Heimdall's custom angr eBPF backend (20+ map type models, all helper stubs, VEX IR lifter) represents significant engineering work for symbolically modeling eBPF behavior. YP could integrate this as an optional \emph{symbolic enrichment layer}: when Prolog queries require deeper path-level reasoning than static dataflow can provide, fall through to angr-based symbolic execution for targeted paths.
+
+\textbf{Strategy 2 — Adapt ITE-chain map encoding for YP's BPF map modeling}:\\
+YP currently tracks BPF map operations (read/write) at the dataflow level. Heimdall's ITE-chain encoding provides a richer mathematical model of map semantics that preserves last-write-wins ordering under symbolic key aliasing. This can extend YP's map analysis to handle aliased key accesses --- a current limitation.
+
+\textbf{Strategy 3 — Use CEGIS loop as query refinement}:\\
+When a YP Prolog query is too coarse-grained and produces spurious results, a CEGIS-style loop (counterexample from Z3 $\to$ refine Prolog clause $\to$ re-verify) could improve assertion precision.
+
+\textbf{Strategy 4 — Semantic enrichment, not replacement}:\\
+Heimdall should be used as a \emph{semantic enrichment layer} for YP: run Heimdall to detect information leaks and safety issues, then YP for functional behavioral assertions. The two are complementary, not competing.
+\end{strategybox}
+
+\begin{limitbox}
+\begin{itemize}
+  \item Heimdall requires C \emph{source code} as input (for LLM translation). YP needs no source --- this is YP's advantage.
+  \item Heimdall is single-program only: no NF chain analysis, no inter-program reasoning.
+  \item Symbolic execution (angr) faces path explosion for complex NFs --- Heimdall acknowledges this limitation.
+  \item Heimdall's equivalence checking proves $A = B$ for two programs, not $A \models P$ for a property $P$ --- it cannot be used directly for behavioral assertion queries.
+\end{itemize}
+\end{limitbox}
+
+% ============================================================
+%  Sections inserted by research analyst subagents
+% ============================================================
+
+\input{sections/vignat_vigor_analysis}
+
+\input{sections/beepl_appnet_enetSTL_analysis}
+
+\input{sections/demystifying_flowmage_analysis}
+
+\input{sections/netSMC_fulllifecycle_analysis}
+
+% ============================================================
+\section{Cross-Paper Strategy Matrix}
+\label{sec:matrix}
+% ============================================================
+
+The following table synthesizes the research strategies extracted from all analyzed papers, mapping each to the specific YP limitation it addresses.
+
+\begin{longtable}{p{3.5cm} p{4cm} p{4cm} p{3cm}}
+\toprule
+\textbf{Paper} & \textbf{Key Technique} & \textbf{YP Improvement} & \textbf{Addresses Limitation} \\
+\midrule
+\endhead
+Heimdall & angr symbolic execution + Z3 equivalence & Symbolic enrichment layer; ITE map encoding & Path explosion; Map aliasing \\
+\midrule
+VigNAT & KLEE + VeriFast: DS split into formal + stateless & Split YP's map analysis: formal model DS ops + SE for logic & Stateful field limit; Map composition \\
+\midrule
+Vigor & Push-button verification framework & Design YP as a framework; Library abstraction & Usability; Integration \\
+\midrule
+BeePL & Type-preserving eBPF DSL compiler & Infer type information from verified bytecode; Type-aware CFG-NC & Limited field tracking \\
+\midrule
+AppNet & Z3 chain equivalence for ANF & Formal chain composition operator for YP; Z3 for chain equivalence & NF chain verification \\
+\midrule
+eNetSTL & Library contracts + verifier metadata & Treat kfunc annotations as trusted behavioral contracts in YP & Library calls; Verification coverage \\
+\midrule
+Demystifying eBPF & $\omega/\rho$ performance model & Add performance assertions to Prolog query vocabulary & Performance validation (new capability) \\
+\midrule
+FlowMage & GPT-4 field access extraction & YP does this formally; Add flow affinity queries to Prolog & Query vocabulary; Positioning \\
+\midrule
+NetSMC & Custom LTL model checker for NF chains & Add temporal operators to YP's Prolog; Adopt containment optimization & Temporal queries; Chain verification \\
+\midrule
+Full-Lifecycle Intent & IBN lifecycle (pre- + post-deploy) & Position YP as pre-deploy phase; Add intent-to-Prolog LLM translation & Ecosystem positioning; Lifecycle coverage \\
+\bottomrule
+\caption{Cross-paper strategy matrix: papers $\to$ YP improvements}
+\label{tab:strategy-matrix}
+\end{longtable}
+
+% ============================================================
+\section{Synthesis: Proposed Research Directions}
+\label{sec:synthesis}
+% ============================================================
+
+Based on the cross-paper analysis, we propose the following concrete research directions for Yaksha-Prashna:
+
+\subsection{Direction 1: Temporal Query Extensions (from NetSMC)}
+
+Extend YP's Prolog query engine with \textbf{LTL-style temporal operators}:
+\begin{itemize}
+  \item $\mathbf{G}(P)$: ``Property $P$ holds for all packets in all executions''
+  \item $\mathbf{F}(P)$: ``Property $P$ holds for some packet in some execution''
+  \item $P\ \mathbf{U}\ Q$: ``$P$ holds until $Q$ is satisfied'' (e.g., ``firewall always sees packet before load balancer'')
+\end{itemize}
+Inspired by NetSMC's LTL model checker, but implemented as Prolog meta-predicates over YP's CFG-NC trace semantics.
+
+\subsection{Direction 2: BPF Map Composition Algebra (from VigNAT + AppNet)}
+
+Formalize BPF map composition across NF chains using:
+\begin{itemize}
+  \item \textbf{Ghost maps} (inspired by VigNAT/Klint): abstract BPF maps as uninterpreted SMT functions
+  \item \textbf{Symbolic state transformers} (inspired by AppNet): model each NF as a function $(packet, state) \to (result, state')$
+  \item Chain composition: sequential composition of state transformers, verified for equivalence or property satisfaction via Z3
+\end{itemize}
+
+\subsection{Direction 3: Type-Aware Analysis (from BeePL)}
+
+Recover type information from eBPF verified bytecode to enrich CFG-NC:
+\begin{itemize}
+  \item The eBPF verifier propagates register types (PTR\_TO\_MAP\_VALUE, PTR\_TO\_PACKET, etc.)
+  \item YP can read the verifier's type annotations from BTF (BPF Type Format) metadata embedded in the ELF
+  \item Use these types to automatically expand the set of tracked fields beyond the current 6
+\end{itemize}
+
+\subsection{Direction 4: Library Contract Integration (from eNetSTL)}
+
+Build a \textbf{YP annotation library}: for common eBPF library functions (Katran, Cilium helpers, eNetSTL kfuncs), pre-compute behavioral contracts and cache them. When YP encounters a call to a known library function, substitute the pre-computed contract instead of re-analyzing the implementation. This is analogous to VigNAT's ``trusted data structure library'' approach.
+
+\subsection{Direction 5: Performance Assertion Layer (from Demystifying eBPF)}
+
+Integrate the $\omega/\rho$ performance model into YP's static analysis:
+\begin{itemize}
+  \item At static time, classify each NF by hook type (XDP native $<$ TC $<$ SK\_SKB)
+  \item Count per-packet operations (map lookups, helper calls, conditional branches)
+  \item Estimate $\rho$ (overhead ratio) and check against $\omega$ (offload ratio) for the expected workload
+  \item Report performance assertion violations: ``This NF's design will hurt performance for workloads with $\omega < \rho - 1$''
+\end{itemize}
+
+\subsection{Direction 6: Intent-to-Prolog LLM Bridge (from FlowMage + Full-Lifecycle)}
+
+Leverage LLMs (as FlowMage does, but deterministically verified by YP) to:
+\begin{itemize}
+  \item Translate operator \emph{intents} (natural language) into YP Prolog assertion clauses
+  \item Use YP to formally verify the generated assertions against the NF bytecode
+  \item Close the loop: if verification fails, LLM generates a repair suggestion
+\end{itemize}
+This positions YP as the formal backbone of an intent-driven NF lifecycle (as the Full-Lifecycle paper envisions).
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================
+
+This research strategy document has analyzed 9 selected papers from a curated survey of 89 works in NF validation and network verification. Through detailed analysis of each paper's technical mechanism, analogy to Yaksha-Prashna, and specific extractable research strategies, we have identified 6 concrete research directions for improving Yaksha-Prashna.
+
+The central finding of this survey is that the research community has developed powerful individual techniques --- symbolic execution (Heimdall), separation logic (VigNAT), push-button verification (Vigor), correct-by-construction type systems (BeePL), chain equivalence checking (AppNet, NetSMC), library contracts (eNetSTL), performance modeling (Demystifying eBPF), LLM-assisted analysis (FlowMage), and intent-driven lifecycle management (Full-Lifecycle) --- but none of these approaches addresses the full stack of requirements that Yaksha-Prashna is uniquely positioned to handle: \emph{bytecode-level, source-free, multi-program chain behavioral verification at deployment scale}.
+
+Our research agenda is therefore not to replace YP with one of these approaches, but to selectively incorporate the most valuable technical insights from each into YP's existing framework, strengthening it incrementally toward a complete NF validation solution.
+
+% ============================================================
+\end{document}

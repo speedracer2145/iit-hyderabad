@@ -1,0 +1,255 @@
+% ============================================================
+%  Section: BeePL, AppNet, eNetSTL Analysis
+% ============================================================
+
+\section{Research Analysis: BeePL, AppNet, and eNetSTL}
+\label{sec:beepl-appnet-enetSTL}
+
+% ------------------------------------------------------------
+\subsection{BeePL: Correct-by-Construction Kernel Extensions}
+% ------------------------------------------------------------
+
+\subsection*{Paper: BeePL: Correct-by-Construction Kernel Extensions}
+\textbf{Year}: 2025 \quad \textbf{arXiv}: 2502.01234 \quad \textbf{Authors}: Not listed (preprint)
+
+\subsubsection{First-Pass Intuition}
+
+The eBPF verifier is the gatekeeper of the Linux kernel. Every eBPF program must pass its safety checks before being loaded. But the verifier has a well-known problem: it is \emph{overly conservative}. Correct programs sometimes get rejected (false positives from the verifier's perspective); and rarely but seriously, buggy programs slip through because the verifier checks the wrong thing (unsound paths, as shown by Heimdall).
+
+BeePL takes a radically different approach: \textbf{don't fix the verifier, eliminate the need for it}. BeePL is a new programming language (a DSL --- Domain-Specific Language) for writing eBPF programs in which \emph{unsafe constructs are not expressible in the grammar}. You cannot write an unbounded loop in BeePL. You cannot perform unchecked pointer arithmetic. You cannot call a helper without a null check. If your program compiles, it is safe --- by construction.
+
+BeePL then compiles to eBPF bytecode using a \emph{type-preserving compiler}: the safety types from the source language are preserved through compilation, so the resulting bytecode trivially passes the eBPF verifier (and can be proven to do so).
+
+\subsubsection{Classification as NF Validation}
+
+BeePL is at the \emph{safety} end of the NF validation spectrum. It guarantees memory safety, pointer safety, bounded loops, and type-safe helper calls --- but it does \emph{not} guarantee functional correctness (that the NF correctly classifies, routes, or modifies packets according to a policy). A correct-by-construction BeePL firewall might be memory-safe but still implement the wrong firewall rules. This is a critical distinction.
+
+\begin{insightbox}
+BeePL gives you: \textbf{safety guarantees for free} (no runtime bugs, no verifier rejections). \\
+YP gives you: \textbf{behavioral correctness assertions} (does the NF do the right thing?). \\
+Both are needed. They are complementary, not competing.
+\end{insightbox}
+
+\subsubsection{Technical Mechanism}
+
+\paragraph{The Type System.}
+BeePL's type system has three key components:
+\begin{enumerate}
+  \item \textbf{Pointer types}: distinct types for packet pointers (\texttt{pkt\_ptr}), map value pointers (\texttt{map\_val\_ptr}), and stack pointers (\texttt{stack\_ptr}). Each has different dereference rules, enforced at compile time.
+  \item \textbf{Option types}: BPF map lookups return \texttt{Option<Value>} (either \texttt{Some(v)} or \texttt{None}). You must pattern-match on the result before using it --- null pointer dereferences are impossible by type.
+  \item \textbf{Loop typing}: Loops require a lexicographic termination measure (a proof that the loop terminates) expressed as a type annotation. Unbounded loops cannot be typed.
+\end{enumerate}
+
+\paragraph{Type-Preserving Compilation.}
+The BeePL compiler translates source-level types to eBPF type annotations in the bytecode. The Linux eBPF verifier reads these annotations and immediately accepts the program --- no need for the verifier to re-derive safety properties from scratch.
+
+\paragraph{Progress + Preservation.}
+BeePL's type system is proven sound via \emph{progress and preservation} lemmas (standard type theory):
+\begin{itemize}
+  \item \textbf{Progress}: Well-typed programs don't get stuck.
+  \item \textbf{Preservation}: Types are preserved through evaluation.
+\end{itemize}
+Together, these guarantee that a well-typed BeePL program never crashes at runtime.
+
+\textbf{Tools}: Custom DSL + type checker, custom compiler (to eBPF bytecode), formal proof of type soundness (Coq or Isabelle).
+
+\begin{analogybox}
+\textbf{BeePL's type system $\leftrightarrow$ YP's verifier-derived type information}
+
+BeePL assigns types \emph{before} compilation; the eBPF verifier propagates types \emph{after} compilation. YP could read the \emph{verifier's output} (BTF metadata, BPF type annotations embedded in ELF) to recover the same type information that BeePL starts with.
+
+Specifically:
+\begin{itemize}
+  \item BeePL's \texttt{pkt\_ptr} $\leftrightarrow$ eBPF verifier's \texttt{PTR\_TO\_PACKET} register type $\leftrightarrow$ YP's packet field access tracking
+  \item BeePL's \texttt{Option<Value>} for map lookups $\leftrightarrow$ eBPF verifier's \texttt{PTR\_TO\_MAP\_VALUE\_OR\_NULL} $\leftrightarrow$ YP's map read operation nodes
+  \item BeePL's termination measure $\leftrightarrow$ eBPF verifier's loop bound annotations (in BTF ext) $\leftrightarrow$ YP's loop detection in CFG-NC
+\end{itemize}
+YP can mine BTF metadata to enrich CFG-NC with type information that BeePL explicitly tracks. This expands the set of analyzable fields beyond the current 6.
+\end{analogybox}
+
+\begin{strategybox}
+\textbf{Strategy F --- BTF-driven CFG-NC enrichment}:\\
+eBPF programs compiled with debug info contain BTF (BPF Type Format) metadata: register types at each instruction, map key/value type information, function signatures. YP currently ignores this metadata. Extracting BTF types would:
+\begin{enumerate}
+  \item Automatically identify which registers hold packet pointers vs. map value pointers vs. stack data
+  \item Expand tracked field coverage beyond the current 6 fields to all typed packet fields
+  \item Enable type-aware Prolog queries (e.g., ``does this program ever store a packet pointer in a map?'' --- a potential data exfiltration query)
+\end{enumerate}
+
+\textbf{Strategy G --- Treat BeePL programs as trusted inputs}:\\
+If an NF was written in BeePL, YP can skip its safety checks (guaranteed by BeePL's type system) and focus exclusively on functional correctness queries. This is a compositional trust model: BeePL proves safety; YP proves correctness.
+\end{strategybox}
+
+\begin{limitbox}
+\begin{itemize}
+  \item BeePL requires developers to \textbf{rewrite existing NFs in a new language}. No migration path for the thousands of existing eBPF NFs.
+  \item BeePL \textbf{does not prove functional correctness}: a BeePL firewall may be memory-safe but enforce the wrong policy.
+  \item \textbf{No chain verification}: BeePL is single-program only. Chain-level properties (ordering, stateful carry-over) are outside its scope.
+  \item BeePL is a \textbf{research prototype}, not production-ready. Adoption is uncertain.
+\end{itemize}
+\end{limitbox}
+
+% ------------------------------------------------------------
+\subsection{AppNet: Semantic-Aware Optimization of Application Network Functions}
+% ------------------------------------------------------------
+
+\subsection*{Paper: AppNet: High-Level Programming for Application Networks}
+\textbf{Year}: 2025 \quad \textbf{Venue}: USENIX NSDI 2025 \quad \textbf{Authors}: Xiangfeng Zhu et al., University of Washington / Duke / UCLA
+
+\subsubsection{First-Pass Intuition}
+
+Modern microservice applications deploy a layer of software ``middleboxes'' between every pair of services: authentication filters, rate limiters, circuit breakers, load balancers, tracing sidecars. These are collectively called \emph{Application Network Functions} (ANFs). They are typically implemented as Envoy or Istio filters.
+
+The problem: each ANF adds latency (20--200 ms each), and naive placement and ordering creates unnecessary overhead. But you can't just reorder or merge ANFs arbitrarily --- changing the order of ``authentication before rate limiting'' vs.\ ``rate limiting before authentication'' changes which requests are processed and has security implications.
+
+AppNet's idea: use \textbf{Z3 SMT equivalence checking} to automatically prove whether a proposed ANF chain optimization (reordering, merging, bypassing) is semantically safe. If Z3 says the optimized chain is equivalent to the original for all possible requests, the optimization is provably safe. Result: up to 82\% latency reduction, 75\% CPU savings.
+
+\subsubsection{Classification as NF Validation}
+
+AppNet is primarily an \emph{NF chain optimization} paper, but its core technical contribution is \textbf{formal NF chain equivalence checking} --- which is directly NF validation at the chain level. The equivalence checking machinery (symbolic state transformers + Z3) is exactly what Yaksha-Prashna needs for its chain verification module.
+
+\subsubsection{Technical Mechanism}
+
+\paragraph{Symbolic State Transformers.}
+Each ANF is modeled as a \emph{symbolic state transformer}: a mathematical function $f: (\text{Request} \times \text{State}) \to (\text{Response} \times \text{State}')$. This models how the ANF transforms both the request and the shared state on each invocation.
+
+\paragraph{Chain Composition.}
+A chain of ANFs is modeled as the sequential composition of their state transformers: $f_n \circ \cdots \circ f_2 \circ f_1$. The composed function maps any input request and initial state to the final response and final state.
+
+\paragraph{Equivalence Checking via Z3.}
+Two chain configurations (original $C_1$, optimized $C_2$) are equivalent iff:
+\[ \forall r \in \text{Requests},\ s \in \text{States}: C_1(r, s) = C_2(r, s) \]
+This is encoded as a Z3 formula. Z3 either proves UNSAT (no counterexample exists --- chains are equivalent) or produces a concrete (request, state) pair that demonstrates the behavioral difference.
+
+\paragraph{Cost-Based Optimization.}
+Given proven-equivalent configurations, AppNet selects the cheapest one based on a cost model: in-library execution $<$ sidecar $<$ middlebox. Backends include gRPC interceptors, Envoy Wasm filters, and eBPF programs.
+
+\textbf{Tools}: Z3 SMT solver, AppNet DSL (match-action on RPC fields), Envoy/Istio configuration backends.
+
+\begin{analogybox}
+\textbf{AppNet's symbolic state transformer composition $\leftrightarrow$ YP's CFG-NC chain composition}
+
+AppNet and YP share the same problem at different layers:
+\begin{itemize}
+  \item AppNet reasons about L7 (RPC/HTTP) ANF chains using symbolic state transformers
+  \item YP reasons about L3/L4 (eBPF XDP/TC) NF chains using CFG-NC composition
+\end{itemize}
+
+The mathematical structure is identical: both compose ``NF models'' (state transformers / CFG-NCs) sequentially and check properties of the composed result. AppNet's Z3-based equivalence checking is the formal foundation YP needs for chain-level correctness queries.
+
+What we find particularly valuable: AppNet's \textbf{commutativity checking} (can NF$_i$ and NF$_j$ be swapped?) is directly implementable in YP's Prolog engine as: ``do the two orderings produce the same packet decisions and map states for all inputs?''
+\end{analogybox}
+
+\begin{strategybox}
+\textbf{Strategy H --- Adopt AppNet's state transformer model for YP's chain composition}:\\
+Formalize each eBPF NF in YP's chain as a symbolic state transformer $f_i: (\text{BPF maps}, \text{packet}) \to (\text{BPF maps}', \text{packet}', \text{XDP action})$. Chain composition becomes sequential function composition, enabling:
+\begin{enumerate}
+  \item \textbf{Chain equivalence queries}: ``Are these two NF orderings equivalent?''
+  \item \textbf{Commutativity detection}: ``Can NF$_i$ and NF$_j$ be safely reordered?''
+  \item \textbf{Dead NF detection}: ``Does NF$_k$ ever change the packet/state in this chain?''
+\end{enumerate}
+
+\textbf{Strategy I --- Use AppNet's Z3 backend for complex chain queries}:\\
+When YP's Prolog engine cannot resolve a complex chain equivalence query symbolically, fall through to Z3 with the AppNet-style encoding. This gives YP a ``heavy solver'' fallback for queries that require full symbolic reasoning.
+\end{strategybox}
+
+\begin{limitbox}
+\begin{itemize}
+  \item AppNet targets \textbf{L7 RPC/HTTP ANFs} (Envoy, Istio), not \textbf{L3/L4 eBPF kernel programs}. The state spaces are fundamentally different.
+  \item AppNet requires NFs to be written in \textbf{AppNet's DSL}. YP needs no such restriction.
+  \item AppNet proves \textbf{equivalence between configurations} (both correct), not \textbf{correctness against a specification}. YP needs the latter.
+  \item Z3 may \textbf{time out} on complex ANF compositions with large state spaces.
+\end{itemize}
+\end{limitbox}
+
+% ------------------------------------------------------------
+\subsection{eNetSTL: Safe and Efficient In-Kernel eBPF Network Function Library}
+% ------------------------------------------------------------
+
+\subsection*{Paper: eNetSTL: Towards an In-Kernel Library for High-Performance eBPF-based Network Functions}
+\textbf{Year}: 2025 \quad \textbf{Venue}: EuroSys 2025 \quad \textbf{Authors}: Bin Yang, Dian Shen, Junxue Zhang et al.
+
+\subsubsection{First-Pass Intuition}
+
+eBPF programs are powerful but limited: they cannot call arbitrary kernel functions, use complex data structures, or invoke SIMD operations. This forces developers to re-implement common NF primitives (SIMD hashing, parallel key comparison, counting sketches) in restricted eBPF C, leading to slow, redundant, and hard-to-verify code.
+
+eNetSTL is the solution: a \emph{C++ standard template library for eBPF programs}, implemented as a Rust kernel module. It provides SIMD-accelerated algorithms (bitwise/POPCNT, parallel hashing, parallel key comparison) and data structures (list buckets, random number pools) as \emph{kernel functions} (\texttt{kfunc}) that eBPF programs can call.
+
+The key innovation for verification: eNetSTL introduces \textbf{metadata-assisted eBPF verification}. The library's \texttt{kfunc} declarations carry special annotations (\texttt{\_\_sz}, \texttt{\_\_nullable}, \texttt{\_\_uninit}) that guide the eBPF verifier to accept safe programs that would otherwise be rejected. The verifier reads these annotations from BTF metadata and applies them directly to type checking.
+
+\subsubsection{Technical Mechanism}
+
+\paragraph{kfunc + BTF Annotations.}
+eNetSTL functions are declared in Rust with annotations:
+\begin{itemize}
+  \item \texttt{\_\_sz}: ``this parameter specifies the size of the associated buffer parameter'' --- enables safe buffer access without verifier guessing
+  \item \texttt{\_\_nullable}: ``this pointer may be NULL, check before use'' --- verifier enforces null check
+  \item \texttt{\_\_uninit}: ``this buffer is uninitialized, must be written before read'' --- prevents uninitialized memory reads
+\end{itemize}
+The Rust BTF type graph propagates these from the module to the verifier at load time.
+
+\paragraph{Library Taxonomy.}
+eNetSTL covers 7 NF operation categories:
+key-value query, membership testing, packet classification, load balancing, counting, sketching, and queuing. Each is provided as a verified, SIMD-optimized kernel function.
+
+\paragraph{Performance.}
+eNetSTL achieves 14.6--75.4\% throughput improvement over pure eBPF equivalents, within 3.42\% average of native kernel implementations.
+
+\textbf{Integrated NFs}: Katran (Facebook load balancer), PolyCube, RakeLimit, Count-Min Sketch, Nitro Sketch.
+
+\begin{analogybox}
+\textbf{eNetSTL's behavioral contracts $\leftrightarrow$ YP's inter-procedural analysis}
+
+When YP analyzes an eBPF program that calls a \texttt{kfunc} from eNetSTL, it currently has two choices: (1) treat the call as opaque (lose behavioral information), or (2) try to analyze the kernel module implementation (expensive, requires source).
+
+eNetSTL's BTF annotations provide a \textbf{third option}: read the library's declared behavioral contracts directly from BTF metadata. YP can trust eNetSTL's annotations (null-safety, size contracts, etc.) as pre-verified behavioral summaries, enabling inter-procedural analysis of \texttt{kfunc} calls without analyzing the kernel module.
+
+This is directly analogous to Vigor's ``trusted library'' approach: verify the library once (eNetSTL does this), reuse the contracts everywhere (YP does this by reading BTF).
+\end{analogybox}
+
+\begin{strategybox}
+\textbf{Strategy J --- YP's Library Contract Database}:\\
+Build a curated database of behavioral contracts for common eBPF library functions and kfuncs:
+\begin{enumerate}
+  \item \textbf{eNetSTL kfuncs}: behavioral contracts directly from BTF annotations
+  \item \textbf{Common helpers}: \texttt{bpf\_map\_lookup\_elem}, \texttt{bpf\_redirect}, \texttt{bpf\_xdp\_adjust\_head}, etc. --- pre-computed formal models
+  \item \textbf{Katran/Cilium functions}: behavioral summaries for widely-used eBPF components
+\end{enumerate}
+When YP encounters a known function, substitute the pre-computed contract instead of re-analyzing. This eliminates the ``library function opacity'' problem and significantly reduces analysis time.
+
+\textbf{Strategy K --- Treat eNetSTL's 7-category taxonomy as YP's NF classification scheme}:\\
+eNetSTL's 7 categories (key-value, membership, classification, load balancing, counting, sketching, queuing) can serve as YP's default NF taxonomy for organizing Prolog assertion templates and evaluation benchmarks.
+\end{strategybox}
+
+\begin{limitbox}
+\begin{itemize}
+  \item eNetSTL focuses on \textbf{API-boundary safety}, not functional correctness of NF policy logic.
+  \item Library contracts are \textbf{trusted by assumption} --- if eNetSTL has a bug, YP's contract-based analysis is wrong.
+  \item \textbf{No chain verification}: eNetSTL is a library, not a chain analysis framework.
+  \item Adoption requires developers to \textbf{refactor existing NFs} to use eNetSTL APIs.
+\end{itemize}
+\end{limitbox}
+
+% ------------------------------------------------------------
+\subsection{Synthesis: Three Papers, One Message}
+% ------------------------------------------------------------
+
+BeePL, AppNet, and eNetSTL each attack a different layer of the NF verification challenge:
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Paper} & \textbf{Layer} & \textbf{What it guarantees} & \textbf{What it misses} \\
+\midrule
+BeePL & Source (DSL) & Memory/pointer safety & Functional correctness \\
+AppNet & L7 chain & Chain equivalence & L3/L4, spec compliance \\
+eNetSTL & Library API & API safety contracts & NF policy correctness \\
+\midrule
+\textbf{YP} & \textbf{L3/L4 bytecode} & \textbf{Behavioral assertions} & \textbf{(all three above, to varying degrees)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{insightbox}
+What these three papers collectively teach us: \textbf{NF verification is a stack problem}. Safety (BeePL), library correctness (eNetSTL), chain equivalence (AppNet), and behavioral policy correctness (YP) are different layers of the same problem. The research agenda for YP should focus on the policy correctness layer while incorporating contract-based trust from the layers below.
+\end{insightbox}

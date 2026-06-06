@@ -1,0 +1,196 @@
+% ============================================================
+%  Section: VigNAT and Vigor Analysis
+% ============================================================
+
+\section{Research Analysis: VigNAT and Vigor}
+\label{sec:vignat-vigor}
+
+\subsection*{Papers}
+\begin{itemize}
+  \item \textbf{VigNAT}: \emph{A Formally Verified NAT}, A.\ Zaostrovnykh, S.\ Pirelli, L.\ Pedrosa, K.\ Argyraki, G.\ Candea. ACM SIGCOMM 2017.
+  \item \textbf{Vigor}: \emph{Verifying Software Network Functions with No Verification Expertise}, A.\ Zaostrovnykh et al. ACM SOSP 2019.
+\end{itemize}
+
+These two papers from EPFL's Dependable Systems Lab represent the most complete vision of \emph{end-to-end formal NF verification} prior to the eBPF era. VigNAT proves a single NAT implementation correct; Vigor generalizes the framework to arbitrary NFs. Together, they constitute the gold standard against which all subsequent NF verification work is measured --- including Yaksha-Prashna.
+
+% ------------------------------------------------------------
+\subsection{VigNAT: A Formally Verified NAT}
+% ------------------------------------------------------------
+
+\subsubsection{First-Pass Intuition}
+
+VigNAT is a Network Address Translator (NAT) written in C that has been \emph{mathematically proven} to be: (1) crash-free, (2) memory-safe, and (3) semantically correct according to RFC 3022 (the NAT specification standard) --- for \emph{every possible sequence of packets, forever}.
+
+This is a remarkable achievement. Most network engineers would test a NAT by throwing traffic at it and checking outputs. VigNAT instead constructs a \emph{mathematical proof} that the NAT is correct for \emph{all possible inputs}, including adversarial packet sequences, edge cases in port allocation, and ICMP error handling.
+
+The central challenge they address is \textbf{path explosion in symbolic execution}. A NAT with connection state has an enormous state space: every possible combination of active connections, port mappings, and timeout states creates a distinct execution path. Symbolic execution tools like KLEE would explode trying to explore all of them simultaneously.
+
+\begin{insightbox}
+\textbf{The key insight of VigNAT}: Decompose the NF into two parts with different verification strategies, then combine the results using \emph{lazy proofs}.
+\begin{enumerate}
+  \item \textbf{Data structure library} (\texttt{libVig}): the stateful component --- hash maps, vectors, port allocators. This is the hard part. Prove it correct using \emph{VeriFast separation logic} (interactive formal proofs with heap reasoning).
+  \item \textbf{Stateless NAT logic}: the packet-processing code that uses the data structures. This is the easy part. Verify it using \emph{KLEE symbolic execution} --- no path explosion because state is abstracted away by the verified library.
+\end{enumerate}
+\end{insightbox}
+
+\subsubsection{Technical Mechanism}
+
+\paragraph{Step 1 --- Formalize the RFC.}
+RFC 3022 defines correct NAT behavior in English prose. The VigNAT team translated this into a formal Python specification: a mathematical state machine with precise preconditions and postconditions for every packet type (TCP, UDP, ICMP).
+
+\paragraph{Step 2 --- Implement libVig with annotations.}
+Write the NAT data structures (Map, Vector, DoubleMap, PortAllocator) in C with VeriFast separation logic annotations. These annotations describe memory ownership (\emph{who owns which heap block}), invariants (\emph{the map always has a valid length}), and preconditions/postconditions for each function.
+
+\paragraph{Step 3 --- Prove libVig correct (VeriFast).}
+Run VeriFast on the annotated C code. VeriFast statically checks that the separation logic annotations are consistent and that the implementation correctly implements the specified behavior. This produces a \emph{machine-checked proof} that \texttt{libVig} is correct.
+
+\paragraph{Step 4 --- Verify NAT logic (KLEE).}
+The NAT packet-processing logic is now written using only \texttt{libVig} API calls --- no raw pointer manipulation. KLEE symbolically executes this logic with symbolic inputs (all possible packet headers, all possible prior states). Because \texttt{libVig} operations are modeled as abstract operations (not concrete implementations), KLEE's state space is manageable.
+
+\paragraph{Step 5 --- Assert RFC compliance.}
+KLEE checks that for every symbolic execution path, the NAT's output satisfies the RFC 3022 formal specification. If KLEE finds a violation, it generates a concrete packet sequence that triggers the bug.
+
+\paragraph{Step 6 --- Combine with lazy proofs.}
+VeriFast proves \texttt{libVig} correct; KLEE proves the NAT logic correct \emph{assuming} a correct library. By composing these proofs, the full system is proven correct. The ``lazy'' aspect: library correctness is proven once and reused across all NFs that use \texttt{libVig}.
+
+\textbf{Tools}: VeriFast, KLEE, Python (RFC spec), DPDK (runtime), Z3 (implicit, via KLEE), Clang/LLVM.
+
+\textbf{Performance}: 1.8 Mpps throughput, $\sim$0.38 $\mu$s per-packet latency --- competitive with unverified DPDK NATs.
+
+\subsubsection{What VigNAT Proves}
+
+\begin{enumerate}
+  \item RFC 3022 port mapping correctness (endpoint-independent and endpoint-dependent)
+  \item Session consistency (every connection has a consistent bi-directional mapping)
+  \item Port allocation correctness (no double-allocation, no port exhaustion silent failure)
+  \item ICMP error translation correctness
+  \item Session timeout behavior
+  \item Memory safety (no buffer overflows, no use-after-free)
+  \item Crash freedom (no assertions fail, no undefined behavior)
+\end{enumerate}
+
+\begin{analogybox}
+\textbf{VigNAT's DS split $\leftrightarrow$ YP's BPF map abstraction}
+
+VigNAT's most important architectural decision --- splitting the NF into ``hard stateful DS'' (formally proven) + ``stateless logic'' (symbolically executed) --- is precisely the structure YP needs for its BPF map analysis:
+
+\begin{itemize}
+  \item VigNAT's \texttt{libVig} $\leftrightarrow$ YP's BPF map dependency tracking
+  \item VigNAT's KLEE over stateless logic $\leftrightarrow$ YP's Prolog queries over CFG-NC
+  \item VigNAT's lazy proofs $\leftrightarrow$ YP's composition of per-NF analyses in chains
+\end{itemize}
+
+The key difference: VigNAT requires \emph{3,000+ lines of manual VeriFast annotations}. YP extracts equivalent structural information automatically from the bytecode, with zero developer burden. This is YP's core advantage.
+\end{analogybox}
+
+\begin{strategybox}
+\textbf{Strategy A --- Adopt the ``DS split'' for YP's BPF map analysis}:\\
+Rather than treating all BPF map operations uniformly, classify them:
+\begin{enumerate}
+  \item \emph{Complex stateful maps} (hash maps with aliased keys, LRU maps): model formally using ghost map axioms (from Klint/VigNAT inspiration).
+  \item \emph{Simple array maps} (per-CPU counters, configuration arrays): analyze with lightweight dataflow, no formal model needed.
+\end{enumerate}
+This reduces analysis complexity for simple NFs while maintaining soundness for complex ones.
+
+\textbf{Strategy B --- Use VigNAT's RFC formalization as a query template}:\\
+VigNAT's Python formalization of RFC 3022 can be adapted as a Prolog query template for YP. When a user asks ``does this NAT implement RFC 3022?'', YP would run the RFC 3022 Prolog assertions against the bytecode's CFG-NC.
+
+\textbf{Strategy C --- Lazy proof composition for chain verification}:\\
+VigNAT's lazy proof idea (prove library once, reuse across NFs) directly applies to YP's NF chain analysis: compute per-NF behavioral summaries once, then compose them for chain-level queries without re-analyzing individual NFs.
+\end{strategybox}
+
+\begin{limitbox}
+\begin{itemize}
+  \item VigNAT requires \textbf{C source code} with \textbf{3,000+ lines of manual VeriFast annotations}. YP requires neither.
+  \item VigNAT is \textbf{single-NF only}: no chain verification, no multi-NF composition.
+  \item VigNAT is specific to \textbf{DPDK-based NFs}. YP targets eBPF/XDP, a different (and newer) ecosystem.
+  \item VigNAT's verification is \textbf{not push-button}: it requires significant verification expertise. Vigor addresses this.
+\end{itemize}
+\end{limitbox}
+
+% ------------------------------------------------------------
+\subsection{Vigor: Verifying Software NFs with No Verification Expertise}
+% ------------------------------------------------------------
+
+\subsubsection{First-Pass Intuition}
+
+Vigor is the natural successor to VigNAT: it generalizes VigNAT's approach into a \emph{framework} that any developer can use without verification expertise. The vision is compelling: an NF developer writes their NF in C using Vigor's library, runs a single command, and gets a formal proof of correctness back.
+
+This is the ``push-button'' promise. The developer does not write VeriFast annotations, does not understand separation logic, and does not configure KLEE. The verification is fully automated --- the framework handles all of it.
+
+Vigor extends VigNAT in two key ways:
+\begin{enumerate}
+  \item \textbf{Broader NF support}: Not just NAT, but also stateful firewall, load balancer, and others.
+  \item \textbf{Composable verification}: Each NF component is verified independently and composed, making the framework extensible.
+\end{enumerate}
+
+\subsubsection{Technical Mechanism}
+
+\paragraph{Framework Architecture.}
+Vigor provides a \textbf{Vigor library} (Vigor STL) of verified data structures built on \texttt{libVig}. Developers write NFs using only this library. The framework then automatically:
+
+\begin{enumerate}
+  \item \textbf{Lifts the NF to a formal model}: Vigor's front-end uses Clang to parse the NF C code and extract a formal model of its behavior.
+  \item \textbf{Runs KLEE with Vigor stubs}: The formal model is symbolically executed with Vigor library functions replaced by their formal specifications (stubs that capture the abstract behavior).
+  \item \textbf{Generates a Python spec}: Vigor's toolchain produces a Python behavioral specification of the NF automatically from the implementation.
+  \item \textbf{Checks spec compliance}: KLEE verifies that the NF implementation satisfies its auto-generated spec for all inputs.
+  \item \textbf{Push-button result}: Developer gets: verified / not verified (with counterexample).
+\end{enumerate}
+
+\paragraph{Composability.}
+Vigor's key architectural insight is \emph{modular verification}: each Vigor library component is verified once, and its verification certificate is reused across all NFs. This is the generalization of VigNAT's ``lazy proofs'' to an entire ecosystem of verified components.
+
+\textbf{Tools}: Clang/LLVM, KLEE, VeriFast (for library components), Python (spec generation), DPDK.
+
+\textbf{NFs verified}: NAT, Firewall, Load Balancer (all DPDK-based).
+
+\begin{analogybox}
+\textbf{Vigor's push-button framework $\leftrightarrow$ YP's zero-expertise bytecode analysis}
+
+Vigor and YP share the same goal: \emph{make formal NF verification accessible without requiring users to be verification experts}. The approaches differ fundamentally:
+
+\begin{itemize}
+  \item Vigor achieves this by \emph{constraining the developer}: use our library, follow our structure.
+  \item YP achieves this by \emph{operating after the fact}: analyze the compiled bytecode of any eBPF NF, regardless of how it was written.
+\end{itemize}
+
+YP's approach is strictly more general: it does not constrain the developer's toolchain, language, or library choices. This is a critical positioning argument.
+
+Vigor's composable verification certificates are the conceptual ancestor of YP's per-NF CFG-NC summaries that are composed for chain analysis. The difference: Vigor's certificates are manual (library annotations); YP's summaries are automatically extracted from bytecode.
+\end{analogybox}
+
+\begin{strategybox}
+\textbf{Strategy D --- Design YP as a framework, not just a tool}:\\
+Vigor's success comes from being a \emph{framework} that developers build within. YP should similarly provide:
+\begin{itemize}
+  \item A \textbf{query library}: pre-built Prolog assertion templates for common NF properties (RFC compliance, no port exhaustion, no silent drops)
+  \item A \textbf{chain composition API}: standard interface for composing per-NF CFG-NC analyses into chain analyses
+  \item A \textbf{result format}: standardized verification certificates that can be shared across NF deployments
+\end{itemize}
+
+\textbf{Strategy E --- Extract and cache behavioral summaries like Vigor's composable certificates}:\\
+Vigor verifies library components once and reuses certificates. YP should maintain a \textbf{behavioral summary cache}: when a common eBPF helper (e.g., a specific Katran function) appears in a program, use the cached CFG-NC summary instead of re-analyzing the binary. This reduces analysis time for NFs built on common libraries.
+\end{strategybox}
+
+\begin{limitbox}
+\begin{itemize}
+  \item Vigor is \textbf{source-level}: developers must write NFs in Vigor's C framework. YP makes no such requirement.
+  \item Vigor has \textbf{no chain verification}: it verifies individual NFs, not service chains. This is a critical gap that Yaksha-Prashna directly addresses.
+  \item Vigor's KLEE-based approach scales poorly to \textbf{complex NFs} with large state spaces (path explosion).
+  \item Vigor targets \textbf{DPDK}, not eBPF. The eBPF ecosystem (with its kernel verifier, map types, and XDP/TC hooks) requires a completely different verification approach.
+\end{itemize}
+\end{limitbox}
+
+% ------------------------------------------------------------
+\subsection{Connecting VigNAT and Vigor to Our Research Agenda}
+% ------------------------------------------------------------
+
+VigNAT and Vigor together establish the most important research insight for improving Yaksha-Prashna:
+
+\begin{insightbox}
+\textbf{The fundamental decomposition principle}: Separate NF verification into (1) \emph{stateful data structure correctness} (hard, requires formal methods) and (2) \emph{packet processing logic correctness} (easier, amenable to symbolic execution or static analysis). Prove each independently, then compose.
+
+For YP, this translates to: separate \emph{BPF map state modeling} (hard --- needs formal map algebra) from \emph{packet field processing analysis} (easier --- YP's current CFG-NC is already good at this). Prove each part with the appropriate technique, then compose via YP's chain analysis framework.
+\end{insightbox}
+
+The other key lesson: Vigor proves that \emph{push-button usability} is achievable without sacrificing formal guarantees. YP is already push-button (just load the bytecode). The goal is to match Vigor's guarantee strength while maintaining YP's usability advantage.
