@@ -3,7 +3,7 @@
 
 ---
 
-## The Core Question Your Professors Are Asking
+## The Core Question we are tryign to address
 
 "How do you extract MORE network context from bytecode than Yaksha-Prashna does?"
 
